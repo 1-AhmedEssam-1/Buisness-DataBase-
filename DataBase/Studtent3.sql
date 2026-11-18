@@ -3,37 +3,37 @@
 -- Explanation: Select the project database for the following batches.
 USE LocalDeliveryMarketplace_Team_135;
 
-
+--Ahmed Essam 64-21960
 GO
 -- Explanation: End this batch; the following CREATE statement starts a new batch.
 -- Explanation: Add an address and make it the customer's active address.
 -- Explanation: Inputs: customer, description, zone. Changes Address rows; returns a procedure status code.
 CREATE PROCEDURE dbo.Add_Customer_Address
 -- Explanation: Inputs: customer ID, address description, and delivery zone ID.
-@CustomerID INT, @Address VARCHAR (150), @Zone_ID INT
+@customer_id INT, @description VARCHAR (150), @zone_id INT
 AS
--- Explanation: Reject a customer ID that is not present in Customer; the existing return code is unchanged.
+-- Explanation: Reject a customer ID that is not present in Customer; invalid input returns -1.
 IF NOT EXISTS (SELECT Customer.customer_id
                FROM   dbo.Customer AS Customer
-               WHERE  Customer.customer_id = @CustomerID)
+               WHERE  Customer.customer_id = @customer_id)
     BEGIN
         PRINT 'Customer ID does not exist';
-        RETURN -3;
+        RETURN -1;
     END
--- Explanation: Reject a NULL or empty description; the existing return code is unchanged.
-IF @Address IS NULL
-   OR @Address = ''
+-- Explanation: Reject a NULL or empty description; invalid input returns -1.
+IF @description IS NULL
+   OR @description = ''
     BEGIN
         PRINT 'Address cannot be null or empty';
-        RETURN -3;
+        RETURN -1;
     END
--- Explanation: Reject a zone ID that is not present in Zone; the existing return code is unchanged.
+-- Explanation: Reject a zone ID that is not present in Zone; invalid input returns -1.
 IF NOT EXISTS (SELECT Zone.zone_id
                FROM   dbo.Zone AS Zone
-               WHERE  Zone.zone_id = @Zone_ID)
+               WHERE  Zone.zone_id = @zone_id)
     BEGIN
         PRINT 'Zone ID does not exist';
-        RETURN -3;
+        RETURN -1;
     END
 -- Explanation: Handle SQL execution errors in the matching CATCH block.
 BEGIN TRY
@@ -42,14 +42,14 @@ BEGIN TRY
     -- Explanation: Deactivate this customer's previous addresses before adding the new active one.
     UPDATE dbo.Address
     SET    is_active = 0
-    WHERE  customer_id = @CustomerID;
+    WHERE  customer_id = @customer_id;
     -- Explanation: Insert the address; address_id is generated and is_active defaults to 1.
     INSERT  INTO dbo.Address (
         customer_id,
         description,
         zone_id
     )
-    VALUES                   (@CustomerID, @Address, @Zone_ID);
+    VALUES                   (@customer_id, @description, @zone_id);
     -- Explanation: Save every change made by this transaction.
     COMMIT TRANSACTION;
     -- Explanation: Report successful completion to the caller.
@@ -473,9 +473,9 @@ CREATE PROCEDURE Update_Delete_Customer_Address
 @customer_id INT, @address_id INT, @description VARCHAR (150), @zone_id INT, @action VARCHAR (20)
 AS
 BEGIN
-    -- Explanation: Reject a NULL action or any action other than Update and Remove.
+    -- Explanation: Reject a NULL action or any action other than Update, Remove, and Delete.
     IF @action IS NULL
-       OR @action NOT IN ('Update', 'Remove')
+       OR @action NOT IN ('Update', 'Remove', 'Delete')
         BEGIN
             RETURN -1;
         END
@@ -505,12 +505,12 @@ BEGIN
             RETURN -4;
         END
     -- Explanation: Removal is also forbidden whenever any cart still references this address.
-    IF @action = 'Remove'
+    IF @action IN ('Remove', 'Delete')
        AND EXISTS (SELECT *
                    FROM   dbo.Cart
                    WHERE  address_id = @address_id)
         BEGIN
-            RETURN -3;
+            RETURN -4;
         END
     -- Explanation: Only the Update branch needs replacement description and zone values.
     IF @action = 'Update'
@@ -537,8 +537,8 @@ BEGIN
             -- Explanation: Report successful completion to the caller.
             RETURN 0;
         END
-    -- Explanation: The Remove branch deletes an address after the earlier reference/ownership checks.
-    IF @action = 'Remove'
+    -- Explanation: The Remove/Delete branch deletes an address after the earlier reference/ownership checks.
+    IF @action IN ('Remove', 'Delete')
         BEGIN
             -- Explanation: Delete an Address row using its table alias A; this is not a column deletion.
             DELETE A
@@ -629,6 +629,13 @@ BEGIN
         BEGIN
             RETURN -1;
         END
+    -- Reject short, space-padded, or non-digit card numbers before inserting.
+    IF LEN(@card_no) <> 16
+       OR @card_no COLLATE Latin1_General_100_BIN2 LIKE '%[^0-9]%'
+    BEGIN
+        RETURN -1;
+    END;
+
     -- Explanation: A card expires when its expiration date is before today; today is accepted.
     IF CAST (GETDATE() AS DATE) > @expiration_date
         BEGIN

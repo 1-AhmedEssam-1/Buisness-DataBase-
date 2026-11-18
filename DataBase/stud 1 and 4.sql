@@ -569,9 +569,9 @@ begin
         Update Product set is_available = 0 where business_id = @business_id;
         Update SubOrder set status ='Cancelled' where business_id = @business_id and status in ('Placed' , 'Assigned');
         
-        Update P set P.refunded_amount = P.refunded_amount + T.total_refund  from Payment P inner join @Refunds R on R.order_id = P.order_id;
-        Update C set C.wallet_balance = C.wallet_balance + R.refund_amount from Customer C inner join 
-        (select customer_id , sum(refund_amount) as total_refund from @Refunds where R.method <> 'Cash' group by customer_id) T
+        Update P set P.refunded_amount = P.refunded_amount + R.refund_amount  from Payment P inner join @Refunds R on R.order_id = P.order_id;
+        Update C set C.wallet_balance = C.wallet_balance + T.total_refund from Customer C inner join 
+        (select customer_id , sum(refund_amount) as total_refund from @Refunds where method <> 'Cash' group by customer_id) T
         on T.customer_id = C.customer_id ;
 
         Update O set status= case when not exists(select 1 from SubOrder S where O.order_id = S.order_id and S.status<>'Cancelled') then 'Cancelled'
