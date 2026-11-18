@@ -616,3 +616,672 @@ as
     Update Business set status ='Active',suspension_reason=null where business_id =@business_id ;
     return 0 ;
 Go
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+
+Create View ActiveVouchers AS
+Select voucher_id, promo_code, customer_id, is_percentage, amount, expiry_date
+from voucher
+WHERE status = 'Unused' AND expiry_date >= CAST(GETDATE() AS DATE);
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Customer_Register
+    @first_name varchar(30), 
+    @middle_name varchar(30), 
+    @last_name varchar(30), 
+    @username varchar(30), 
+    @password varchar(30), 
+    @email varchar(100), 
+    @phone char(11), 
+    @dob date
+AS
+BEGIN
+    -- 1. Validate constraints manually
+    IF EXISTS (SELECT 1 FROM Users WHERE username = @username OR email = @email)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+    
+    IF @first_name IS NULL OR @last_name IS NULL OR @username IS NULL OR @password IS NULL OR @email IS NULL OR @phone IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Start Transaction
+    BEGIN TRAN;
+
+    -- 3. Insert into superclass
+    INSERT INTO Users (first_name, middle_name, last_name, username, password, email, dob)
+    VALUES (@first_name, @middle_name, @last_name, @username, @password, @email, @dob);
+
+    -- 4. Get the generated ID
+    DECLARE @new_user_id INT = SCOPE_IDENTITY();
+
+    -- 5. Insert into subclass and phone tables
+    INSERT INTO Customer (customer_id, wallet_balance)
+    VALUES (@new_user_id, 0);
+
+    INSERT INTO User_Phone (user_id, phone)
+    VALUES (@new_user_id, @phone);
+
+    -- 6. Commit and return success
+    COMMIT TRAN;
+    RETURN 0;
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Partner_Register
+    @first_name varchar(30), 
+    @middle_name varchar(30), 
+    @last_name varchar(30), 
+    @username varchar(30), 
+    @password varchar(30), 
+    @email varchar(100), 
+    @phone char(11), 
+    @dob date
+AS
+BEGIN
+    -- 1. Validate constraints manually
+    IF EXISTS (SELECT 1 FROM Users WHERE username = @username OR email = @email)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+    
+    IF @first_name IS NULL OR @last_name IS NULL OR @username IS NULL OR @password IS NULL OR @email IS NULL OR @phone IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Start Transaction
+    BEGIN TRAN;
+
+    -- 3. Insert into superclass
+    INSERT INTO Users (first_name, middle_name, last_name, username, password, email, dob)
+    VALUES (@first_name, @middle_name, @last_name, @username, @password, @email, @dob);
+
+    -- 4. Get the generated ID
+    DECLARE @new_user_id INT = SCOPE_IDENTITY();
+
+    -- 5. Insert into subclass and phone tables
+    INSERT INTO Partner (partner_id)
+    VALUES (@new_user_id);
+
+    INSERT INTO User_Phone (user_id, phone)
+    VALUES (@new_user_id, @phone);
+
+    -- 6. Commit and return success
+    COMMIT TRAN;
+    RETURN 0;
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Rider_Register
+    @first_name varchar(30), 
+    @middle_name varchar(30), 
+    @last_name varchar(30), 
+    @username varchar(30), 
+    @password varchar(30), 
+    @email varchar(100), 
+    @phone char(11), 
+    @dob date,
+    @vehicle_type varchar(30), 
+    @plate_no varchar(15), 
+    @license_no varchar(20), 
+    @zone_id int
+AS
+BEGIN
+    -- 1. Validate constraints manually
+    IF EXISTS (SELECT 1 FROM Users WHERE username = @username OR email = @email) OR EXISTS (SELECT 1 FROM Rider WHERE @plate_no = plate_no OR @license_no = license_no)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+    
+    IF @first_name IS NULL OR @last_name IS NULL OR @username IS NULL OR @password IS NULL OR @email IS NULL OR @phone IS NULL OR @vehicle_type IS NULL OR @plate_no IS NULL OR @license_no IS NULL OR @zone_id IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Start Transaction
+    BEGIN TRAN;
+
+    -- 3. Insert into superclass
+    INSERT INTO Users (first_name, middle_name, last_name, username, password, email, dob)
+    VALUES (@first_name, @middle_name, @last_name, @username, @password, @email, @dob);
+
+    -- 4. Get the generated ID
+    DECLARE @new_user_id INT = SCOPE_IDENTITY();
+
+    -- 5. Insert into subclass and phone tables
+    INSERT INTO Rider (rider_id, vehicle_type, plate_no, license_no, zone_id)
+    VALUES (@new_user_id, @vehicle_type, @plate_no, @license_no, @zone_id);
+
+    INSERT INTO User_Phone (user_id, phone)
+    VALUES (@new_user_id, @phone);
+
+    -- 6. Commit and return success
+    COMMIT TRAN;
+    RETURN 0;
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Function dbo.CustomerLoginValidation(@username varchar(30), @password varchar(30))
+RETURNS BIT
+AS
+Begin
+    DECLARE @user_id INT;
+
+    SELECT @user_id = user_id
+    FROM Users
+    WHERE username = @username AND password = @password and account_status = 'Active';
+
+    IF @user_id IS NULL
+        RETURN 0; -- Invalid credentials
+
+    IF NOT EXISTS (SELECT 1 FROM Customer WHERE customer_id = @user_id)
+        RETURN 0; -- Not a customer
+
+    RETURN 1; --Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Function dbo.PartnerLoginValidation(@username varchar(30), @password varchar(30))
+RETURNS BIT
+AS
+Begin
+    DECLARE @user_id INT;
+
+    SELECT @user_id = user_id
+    FROM Users
+    WHERE username = @username AND password = @password and account_status = 'Active';
+
+    IF @user_id IS NULL
+        RETURN 0; -- Invalid credentials
+
+    IF NOT EXISTS (SELECT 1 FROM Partner WHERE partner_id = @user_id)
+        RETURN 0; -- Not a partner
+
+    RETURN 1; --Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Function dbo.RiderLoginValidation(@username varchar(30), @password varchar(30))
+RETURNS BIT
+AS
+Begin
+    DECLARE @user_id INT;
+
+    SELECT @user_id = user_id
+    FROM Users
+    WHERE username = @username AND password = @password and account_status = 'Active';
+
+    IF @user_id IS NULL
+        RETURN 0; -- Invalid credentials
+
+    IF NOT EXISTS (SELECT 1 FROM Rider WHERE rider_id = @user_id)
+        RETURN 0; -- Not a rider
+
+    RETURN 1; --Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Function dbo.AdminLoginValidation(@username varchar(30), @password varchar(30))
+RETURNS BIT
+AS
+Begin
+    DECLARE @user_id INT;
+
+    SELECT @user_id = user_id
+    FROM Users
+    WHERE username = @username AND password = @password and account_status = 'Active';
+
+    IF @user_id IS NULL
+        RETURN 0; -- Invalid credentials
+
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @user_id)
+        RETURN 0; -- Not an admin
+
+    RETURN 1; --Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Change_Password
+    @user_id int, 
+    @old_password varchar(30), 
+    @new_password varchar(30), 
+    @new_password_repeat varchar(30), 
+    @success bit OUTPUT
+AS
+BEGIN
+    Declare @current_password varchar(30);
+    SELECT @current_password = password FROM Users WHERE user_id = @user_id;
+    IF @current_password IS NULL OR @current_password <> @old_password OR @new_password <> @new_password_repeat
+    BEGIN
+        SET @success = 0; -- Failure
+        RETURN;
+    END
+
+    UPDATE Users
+    SET password = @new_password
+    WHERE user_id = @user_id;
+    SET @success = 1; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Create_Admin
+    @first_name varchar(30), 
+    @middle_name varchar(30), 
+    @last_name varchar(30), 
+    @username varchar(30), 
+    @password varchar(30), 
+    @email varchar(100), 
+    @phone char(11), 
+    @dob date,
+    @role varchar(20),
+    @zone_id int = NULL,
+    @super_admin_id int
+AS
+Begin
+    -- 1. Validate constraints manually
+    IF EXISTS (SELECT 1 FROM Users WHERE username = @username OR email = @email)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+    
+    IF @first_name IS NULL OR @last_name IS NULL OR @username IS NULL OR @password IS NULL OR @email IS NULL OR @phone IS NULL or @super_admin_id IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the role and zone_id align with Business Rule 2
+    IF (ISNULL(@role, 'Super Admin') = 'Super Admin' AND @zone_id IS NOT NULL) OR (@role = 'Zone Admin' AND @zone_id IS NULL)
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 3. Verify the executing user is a Super Admin
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @super_admin_id AND role = 'Super Admin')
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Start Transaction
+    BEGIN TRAN;
+    -- 5. Insert into superclass
+    INSERT INTO Users (first_name, middle_name, last_name, username, password, email, dob)
+    VALUES (@first_name, @middle_name, @last_name, @username, @password, @email, @dob);
+
+    -- 6. Get the generated ID
+    DECLARE @new_user_id INT = SCOPE_IDENTITY();
+
+    -- 7. Insert into subclass and phone tables
+    INSERT INTO Admin (admin_id, role)
+    VALUES (@new_user_id, @role);
+
+    INSERT INTO User_Phone (user_id, phone)
+    VALUES (@new_user_id, @phone);
+
+    -- 8. Commit and return success
+    COMMIT TRAN;
+    RETURN 0;
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Approve_Business
+    @business_id int,
+    @admin_id int
+AS
+BEGIN
+    -- 1. Validate that the business exists
+    IF NOT EXISTS (SELECT 1 FROM Business WHERE business_id = @business_id)
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the business is pending approval
+    IF NOT EXISTS (SELECT 1 FROM Business WHERE business_id = @business_id AND status = 'Pending')
+    BEGIN
+        RETURN -4; -- Wrong status error code
+    END
+
+    -- 3. Validate that the admin exists and is a Super Admin or Zone Admin for the business's zone
+    DECLARE @business_zone_id INT;
+    SELECT @business_zone_id = zone_id FROM Business WHERE business_id = @business_id;
+
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id AND (role = 'Super Admin' OR (role = 'Zone Admin' AND zone_id = @business_zone_id)))
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Update the business status to 'Active'
+    UPDATE Business
+    SET status = 'Active'
+    WHERE business_id = @business_id;
+
+    RETURN 0; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create PROCEDURE Reject_Business
+    @business_id int,
+    @admin_id int
+AS
+BEGIN
+    -- 1. Validate that the business exists
+    IF NOT EXISTS (SELECT 1 FROM Business WHERE business_id = @business_id)
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the business is pending approval
+    IF NOT EXISTS (SELECT 1 FROM Business WHERE business_id = @business_id AND status = 'Pending')
+    BEGIN
+        RETURN -4; -- Wrong status error code
+    END
+
+    -- 3. Validate that the admin exists and is a Super Admin or Zone Admin for the business's zone
+    DECLARE @business_zone_id INT;
+    SELECT @business_zone_id = zone_id FROM Business WHERE business_id = @business_id;
+
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id AND (role = 'Super Admin' OR (role = 'Zone Admin' AND zone_id = @business_zone_id)))
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Update the business status to 'Rejected'
+    UPDATE Business
+    SET status = 'Rejected'
+    WHERE business_id = @business_id;
+
+    RETURN 0; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Procedure Assign_Admin_Zone
+    @admin_id int,
+    @zone_id int,
+    @super_admin_id int
+AS
+BEGIN
+    -- 1. Validate that the admin exists and is a Zone Admin
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id AND role = 'Zone Admin')
+    BEGIN
+        RETURN -3; -- Invalid input error code
+    END
+
+    -- 2. Validate that the zone exists
+    IF NOT EXISTS (SELECT 1 FROM Zone WHERE zone_id = @zone_id)
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 3. Validate that the executing user is a Super Admin
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @super_admin_id AND role = 'Super Admin')
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Validate that the admin is not already assigned to this zone
+    IF EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id AND zone_id = @zone_id)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+
+    -- 5. Assign the zone to the admin
+    UPDATE Admin
+    SET zone_id = @zone_id
+    WHERE admin_id = @admin_id;
+
+    RETURN 0; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Procedure Issue_Voucher
+    @customer_id int,
+    @promo_code varchar(30),
+    @is_percentage bit,
+    @amount decimal(10,2),
+    @expiry_date date,
+    @admin_id int
+AS
+BEGIN
+    -- 1. Validate that all inputs are provided
+    IF @customer_id IS NULL OR @promo_code IS NULL OR @is_percentage IS NULL OR @amount IS NULL OR @expiry_date IS NULL OR @admin_id IS NULL OR @amount <= 0 OR @expiry_date < CAST(GETDATE() AS DATE)
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the customer exists
+    IF NOT EXISTS (SELECT 1 FROM Customer WHERE customer_id = @customer_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 3. Validate that the promo_code is unique
+    IF EXISTS (SELECT 1 FROM Voucher WHERE promo_code = @promo_code)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+
+    -- 4. Validate that the admin exists
+
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 5. Insert the voucher
+    INSERT INTO Voucher (promo_code, is_percentage, amount, expiry_date, customer_id)
+    VALUES (@promo_code, @is_percentage, @amount, @expiry_date, @customer_id);
+
+    RETURN 0; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Procedure Blacklist_Customer
+    @customer_id int,
+    @admin_id int,
+    @reason varchar(255)
+AS
+BEGIN
+    -- 1. Validate that all inputs are provided
+    IF @customer_id IS NULL OR @admin_id IS NULL OR @reason IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the customer exists
+    IF NOT EXISTS (SELECT 1 FROM Customer WHERE customer_id = @customer_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 3. Validate that the admin exists
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Validate Zone Admin scope (BR-3)
+    DECLARE @admin_role VARCHAR(20);
+    DECLARE @admin_zone INT;
+
+    SELECT @admin_role = role, @admin_zone = zone_id 
+    FROM Admin 
+    WHERE admin_id = @admin_id;
+
+    IF @admin_role = 'Zone Admin'
+    BEGIN
+        -- Check if the customer has at least one address in the Zone Admin's zone
+        IF NOT EXISTS (SELECT 1 FROM Address WHERE customer_id = @customer_id AND zone_id = @admin_zone)
+        BEGIN
+            RETURN -3; -- Not allowed error code
+        END
+    END
+
+    -- 5. Validate that the customer is not already blacklisted
+    IF EXISTS (SELECT 1 FROM Blacklist WHERE customer_id = @customer_id)
+    BEGIN
+        RETURN -2; -- Duplicate error code
+    END
+
+    BEGIN TRAN;
+    -- 6. Insert into Blacklist and update account_status in Users table
+    INSERT INTO Blacklist (customer_id, admin_id, reason)
+    VALUES (@customer_id, @admin_id, @reason);
+
+    UPDATE Users
+    SET account_status = 'Blacklisted'
+    WHERE user_id = @customer_id;
+
+    -- Declare a variable to hold the current order ID in the loop
+    DECLARE @current_order_id INT;
+
+    -- Set up a cursor to find all orders that Cancel_Order would accept
+    DECLARE order_cursor CURSOR FOR
+    SELECT o.order_id
+    FROM Orders o
+    INNER JOIN Cart c ON o.cart_id = c.cart_id
+    WHERE c.customer_id = @customer_id AND o.status != 'Cancelled' AND NOT EXISTS (
+          -- Ensure no SubOrder has progressed to Picked Up or Delivered
+          SELECT 1 
+          FROM SubOrder so 
+          WHERE so.order_id = o.order_id AND so.status IN ('Picked Up', 'Delivered')
+      );
+
+    OPEN order_cursor;
+    FETCH NEXT FROM order_cursor INTO @current_order_id;
+
+    -- Loop through each eligible order and execute Student 3's procedure
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        EXEC Cancel_Order @order_id = @current_order_id;
+        
+        FETCH NEXT FROM order_cursor INTO @current_order_id;
+    END;
+
+    CLOSE order_cursor;
+    DEALLOCATE order_cursor;
+
+    -- Finally, delete all Unused vouchers for the blacklisted customer
+    DELETE FROM Voucher
+    WHERE customer_id = @customer_id AND status = 'Unused';
+
+    COMMIT TRAN;
+    RETURN 0; -- Success
+END;
+GO
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+
+-- Student 1: <Belal Ahmed Abdelgawad> - <64-24788>
+Create Procedure Lift_Customer_Blacklist
+    @customer_id int,
+    @admin_id int
+AS
+BEGIN
+    -- 1. Validate that all inputs are provided
+    IF @customer_id IS NULL OR @admin_id IS NULL
+    BEGIN
+        RETURN -1; -- Invalid input error code
+    END
+
+    -- 2. Validate that the customer exists
+    IF NOT EXISTS (SELECT 1 FROM Customer WHERE customer_id = @customer_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 3. Validate that the admin exists
+    IF NOT EXISTS (SELECT 1 FROM Admin WHERE admin_id = @admin_id)
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    -- 4. Validate that the customer is currently blacklisted
+    IF NOT EXISTS (SELECT 1 FROM Blacklist WHERE customer_id = @customer_id)
+    BEGIN
+        RETURN -4; -- Wrong status error code
+    END
+
+    DECLARE @blacklisting_admin_id INT;
+    SELECT @blacklisting_admin_id = admin_id FROM Blacklist WHERE customer_id = @customer_id;
+
+    -- 5. Validate that the admin is the same admin who blacklisted the customer
+    IF @blacklisting_admin_id <> @admin_id
+    BEGIN
+        RETURN -3; -- Not allowed error code
+    END
+
+    BEGIN TRAN;
+    -- 6. Delete from Blacklist and update account_status in Users table
+    DELETE FROM Blacklist
+    WHERE customer_id = @customer_id;
+
+    UPDATE Users
+    SET account_status = 'Active'
+    WHERE user_id = @customer_id;
+
+    COMMIT TRAN;
+    RETURN 0; -- Success
+END;
+GO
